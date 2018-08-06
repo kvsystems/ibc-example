@@ -1,0 +1,53 @@
+1. Получить минимальную, максимальную и среднюю стоимость всех рабов весом более 60 кг.
+SELECT
+	MAX(sc.cost) as max_cost,
+    MIN(sc.cost) as min_cost,
+    AVG(sc.cost) as avg_cost
+FROM eve_slave s
+LEFT JOIN eve_slave_to_currency sc
+	ON sc.slave_id = s.slave_id
+WHERE s.weight > 60
+
+2. Выбрать категории, в которых больше 10 рабов.
+SELECT DISTINCT cd.name FROM eve_slave_to_category stc
+    LEFT JOIN eve_category_description cd
+        ON cd.category_id = stc.category_id
+GROUP BY stc.category_id HAVING COUNT( stc.slave_id ) > 10
+
+3. Выбрать категорию с наибольшей суммарной стоимостью рабов.
+SELECT
+	CatSumm.name as CategoryName,
+    MAX(CatSumm.CategorySumm) as MaxCategorySumm FROM (
+        SELECT cd.name, SUM(stc.cost) as CategorySumm FROM eve_slave_to_category sc
+            LEFT JOIN eve_slave_to_currency stc
+                ON stc.slave_id = stc.slave_id
+            LEFT JOIN eve_category_description cd
+                ON cd.category_id = sc.category_id
+        GROUP BY sc.category_id
+) as CatSumm
+
+4. Выбрать категории, в которых мужчин больше чем женщин.
+SELECT Result.CategoryName, Result.MenCount, Result.WomenCount FROM (
+    SELECT
+        cd.name as CategoryName,
+        COUNT(CASE WHEN s.gender = 1 THEN s.gender END) as MenCount,
+        COUNT(CASE WHEN s.gender = 2 THEN s.gender END) as WomenCount
+    FROM eve_category_description cd
+        LEFT JOIN eve_slave_to_category sc
+            ON sc.category_id = cd.category_id
+        LEFT JOIN eve_slave s
+            ON s.slave_id = sc.slave_id
+    GROUP BY cd.category_id
+) as Result
+WHERE Result.MenCount > Result.WomenCount
+
+
+5. Количество рабов в категории "Для кухни" (включая все вложенные категории) - победил только так.
+SELECT parent.alias, COUNT(eve_slave_to_category.slave_id)
+FROM eve_category AS node ,
+        eve_category AS parent,
+        eve_slave_to_category
+WHERE node.category_id BETWEEN parent.category_id AND eve_slave_to_category.slave_id
+        AND node.category_id = eve_slave_to_category.category_id
+GROUP BY parent.alias
+ORDER BY node.category_id;
